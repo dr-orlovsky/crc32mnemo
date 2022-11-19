@@ -1,6 +1,6 @@
 [package]
 name = "crc32mnemo"
-version = "0.1.0"
+version = "0.2.0"
 description = "Tool providing mnemonic representation for a CRC32 sum over given data"
 authors = ["Dr Maxim Orlovsky <orlovsky@lnp-bp.org>"]
 keywords = ["crc32", "mnemonic", "encoding"]
@@ -15,4 +15,5 @@ rust-version = "1.59.0"
 [dependencies]
 mnemonic = "1.0.1"
 crc32fast = "1.3.2"
+bech32 = "0.9.1"
 clap = { version = "4.0.26", features = ["derive"] }
