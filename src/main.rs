@@ -1,9 +1,14 @@
+#[macro_use]
+extern crate amplify;
+
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
+use std::string::FromUtf8Error;
 
 use bech32::FromBase32;
 use clap::Parser;
+use colorize::AnsiColor;
 
 #[derive(Clone, Debug, Parser)]
 #[command(author, version, about)]
@@ -29,26 +34,47 @@ pub fn open_file_or_stdin(filename: Option<impl AsRef<Path>>) -> Result<Box<dyn 
     }
 }
 
-fn main() -> Result<(), io::Error> {
+#[derive(Debug, Display, Error, From)]
+#[display(inner)]
+pub enum Error {
+    #[from]
+    Io(io::Error),
+
+    #[display("incorrect bech32(m) string due to {0}")]
+    #[from]
+    Bech32(bech32::Error),
+
+    #[from]
+    Utf8(FromUtf8Error),
+}
+
+fn main() {
     let args = Args::parse();
 
-    let data = if let Some(b32) = args.bech32 {
-        let (_hrp, encoded, _variant) = bech32::decode(&b32).expect("invalid bech32 data");
-        Vec::<u8>::from_base32(&encoded).expect("invalid bech32 data")
-    } else {
-        let mut file = open_file_or_stdin(args.file)?;
-        let mut data = vec![];
-        file.read_to_end(&mut data)?;
-        data
-    };
-    // TODO: Use streaming hasher
-    let crc32 = crc32fast::hash(&data);
-    println!("CRC32 sum: {:08x}", crc32);
+    if let Err(err) = args.exec() {
+        eprintln!("{}: {}", "Error".red(), err);
+    }
+}
 
-    let mut mnemonic = vec![];
-    mnemonic::encode(crc32.to_be_bytes(), &mut mnemonic)?;
-    let mnemonic = String::from_utf8(mnemonic).expect("mnemonic library error");
-    println!("Mnemonic: {}", mnemonic);
+impl Args {
+    fn exec(self) -> Result<(), Error> {
+        let data = if let Some(b32) = self.bech32 {
+            let (_hrp, encoded, _variant) = bech32::decode(&b32)?;
+            Vec::<u8>::from_base32(&encoded)?
+        } else {
+            let mut file = open_file_or_stdin(self.file)?;
+            let mut data = vec![];
+            file.read_to_end(&mut data)?;
+            data
+        };
+        // TODO: Use streaming hasher
+        let crc32 = crc32fast::hash(&data);
+        println!("CRC32 sum: {:08x}", crc32);
 
-    Ok(())
+        let mut mnemonic = vec![];
+        mnemonic::encode(crc32.to_be_bytes(), &mut mnemonic)?;
+        let mnemonic = String::from_utf8(mnemonic)?;
+        println!("Mnemonic: {}", mnemonic);
+        Ok(())
+    }
 }
